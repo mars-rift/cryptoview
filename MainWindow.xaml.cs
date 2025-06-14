@@ -9,6 +9,9 @@ using System.Windows.Controls;
 
 namespace cryptoview
 {
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
     public partial class MainWindow : Window
     {
         private static readonly HttpClient _httpClient = new HttpClient();
@@ -23,8 +26,18 @@ namespace cryptoview
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             StatusTextBlock.Text = "Loading exchanges...";
+            LoadExchangeButton.IsEnabled = false; // Disable button during initial loading
+              // Configure loading indicator
+            LoadingGrid.Visibility = Visibility.Visible;
+            LoadingStatusTextBlock.Text = "Loading and filtering exchanges with valid data...";
+            LoadingProgressBar.Value = 0;
+            
+            // No popup message, rely on the status indicators instead
+            
             await LoadExchangesAsync();
-            StatusTextBlock.Text = "Ready";
+            
+            LoadExchangeButton.IsEnabled = true; // Re-enable button once loading is complete
+            LoadingGrid.Visibility = Visibility.Collapsed; // Ensure loading indicator is hidden
         }
 
         private async Task LoadExchangeDataAsync(string exchangeId)
@@ -122,8 +135,8 @@ namespace cryptoview
                 MessageBox.Show($"Error: {ex.Message}", "API Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
-        private async Task ParseExchangeDataArray(string exchangeId, string json)
+        
+        private Task ParseExchangeDataArray(string exchangeId, string json)
         {
             try
             {
@@ -210,6 +223,8 @@ namespace cryptoview
             {
                 StatusTextBlock.Text = $"Failed to parse array format: {ex.Message}";
             }
+            
+            return Task.CompletedTask; // Return a completed task since we're not doing any async work
         }
 
         private bool IsTimestampOutdated(long timestamp)
@@ -245,7 +260,7 @@ namespace cryptoview
             }
         }
 
-        private async Task ParseExchangeDataAlternative(string exchangeId, string json)
+        private Task ParseExchangeDataAlternative(string exchangeId, string json)
         {
             try
             {
@@ -357,12 +372,20 @@ namespace cryptoview
             {
                 StatusTextBlock.Text = $"This exchange format is not supported: {ex.Message}";
             }
+            
+            return Task.CompletedTask;
         }
 
         private async Task LoadExchangesAsync()
         {
             try
             {
+                // Show loading indicators
+                LoadingGrid.Visibility = Visibility.Visible;
+                LoadingStatusTextBlock.Text = "Loading exchanges...";
+                LoadingProgressBar.Value = 0;
+                
+                StatusTextBlock.Text = "Loading exchanges...";
                 string url = "https://api.coinlore.net/api/exchanges/";
                 HttpResponseMessage response = await _httpClient.GetAsync(url);
 
@@ -376,18 +399,64 @@ namespace cryptoview
                     {
                         _exchangeMap.Clear();
                         ExchangesComboBox.Items.Clear();
+                        
+                        LoadingStatusTextBlock.Text = "Filtering exchanges with valid data...";
+                        StatusTextBlock.Text = "Filtering exchanges with valid data...";
+                        
+                        int totalExchanges = exchanges.Count;
+                        int validExchanges = 0;
+                        int checkedExchanges = 0;
+                        
+                        // Create a list to hold exchanges that have valid data
+                        var validExchangeNames = new List<string>();
 
                         foreach (var exchange in exchanges)
                         {
                             if (!string.IsNullOrEmpty(exchange.Value.Name))
                             {
-                                _exchangeMap.Add(exchange.Value.Name, exchange.Key);
-                                ExchangesComboBox.Items.Add(exchange.Value.Name);
+                                // Check if this exchange has valid data before adding it
+                                bool isValid = await HasValidExchangeData(exchange.Key);
+                                
+                                if (isValid)
+                                {
+                                    _exchangeMap.Add(exchange.Value.Name, exchange.Key);
+                                    validExchangeNames.Add(exchange.Value.Name);
+                                    validExchanges++;
+                                }
+                                
+                                checkedExchanges++;
+                                
+                                // Update progress
+                                double progressPercentage = (double)checkedExchanges / totalExchanges * 100;
+                                LoadingProgressBar.Value = progressPercentage;
+                                
+                                // Update status periodically to show progress
+                                if (checkedExchanges % 5 == 0 || checkedExchanges == 1 || checkedExchanges == totalExchanges)
+                                {
+                                    LoadingStatusTextBlock.Text = $"Filtering exchanges: {validExchanges} valid out of {checkedExchanges} checked...";
+                                    StatusTextBlock.Text = $"Filtering exchanges: {validExchanges} valid out of {checkedExchanges} checked...";
+                                }
                             }
+                        }
+                        
+                        // Sort exchange names alphabetically for better UX
+                        validExchangeNames.Sort();
+                        
+                        // Add the valid exchanges to the ComboBox
+                        foreach (var name in validExchangeNames)
+                        {
+                            ExchangesComboBox.Items.Add(name);
                         }
 
                         if (ExchangesComboBox.Items.Count > 0)
+                        {
                             ExchangesComboBox.SelectedIndex = 0;
+                            StatusTextBlock.Text = $"Ready - {validExchanges} valid exchanges loaded out of {totalExchanges} total";
+                        }
+                        else
+                        {
+                            StatusTextBlock.Text = "No valid exchanges found";
+                        }
                     }
                 }
                 else
@@ -399,6 +468,11 @@ namespace cryptoview
             {
                 StatusTextBlock.Text = $"Error loading exchanges: {ex.Message}";
                 MessageBox.Show($"Error: {ex.Message}", "API Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                // Hide loading indicators
+                LoadingGrid.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -412,9 +486,8 @@ namespace cryptoview
 
             LoadExchangeButton.IsEnabled = false;
             try
-            {
-                string exchangeName = ExchangesComboBox.SelectedItem.ToString();
-                if (_exchangeMap.TryGetValue(exchangeName, out string exchangeId))
+            {                string? exchangeName = ExchangesComboBox.SelectedItem?.ToString();
+                if (exchangeName != null && _exchangeMap.TryGetValue(exchangeName, out string exchangeId))
                 {
                     await LoadExchangeDataAsync(exchangeId);
                 }
@@ -422,6 +495,79 @@ namespace cryptoview
             finally
             {
                 LoadExchangeButton.IsEnabled = true;
+            }
+        }
+
+        private async Task<bool> HasValidExchangeData(string exchangeId)
+        {
+            try
+            {
+                // Configure a shorter timeout for this check to keep the filtering process moving
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(5); // Shorter timeout for validation
+                
+                string url = $"https://api.coinlore.net/api/exchange/?id={exchangeId}";
+                HttpResponseMessage response = await client.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return false;
+                }
+
+                string json = await response.Content.ReadAsStringAsync();
+
+                if (string.IsNullOrWhiteSpace(json) || json.Trim() == "{}" || json.Trim() == "[]")
+                {
+                    return false;
+                }
+
+                using (JsonDocument document = JsonDocument.Parse(json))
+                {
+                    var root = document.RootElement;
+
+                    // Case 1: If it's an object with a "pairs" property containing a non-empty array, it's valid
+                    if (root.ValueKind == JsonValueKind.Object && 
+                        root.TryGetProperty("pairs", out JsonElement pairsElement) &&
+                        pairsElement.ValueKind == JsonValueKind.Array && 
+                        pairsElement.GetArrayLength() > 0)
+                    {
+                        return true;
+                    }
+
+                    // Case 2: If it's an array with more than a few items, it's probably valid
+                    if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 3)
+                    {
+                        // Do a quick check of the first few elements to see if they look like pairs
+                        bool hasPairProperties = false;
+                        int checkedItems = 0;
+                        
+                        foreach (JsonElement item in root.EnumerateArray())
+                        {
+                            if (checkedItems++ >= 3) break; // Only check the first few
+                            
+                            // Check if it has typical pair properties
+                            if ((item.TryGetProperty("base", out _) || 
+                                 item.TryGetProperty("symbol", out _)) &&
+                                (item.TryGetProperty("quote", out _) || 
+                                 item.TryGetProperty("price", out _) || 
+                                 item.TryGetProperty("price_usd", out _)))
+                            {
+                                hasPairProperties = true;
+                                break;
+                            }
+                        }
+                        
+                        return hasPairProperties;
+                    }
+
+                    // No valid data structure found
+                    return false;
+                }
+            }
+            catch
+            {
+                // If there's any error in processing, consider it invalid
+                return false;
             }
         }
     }
