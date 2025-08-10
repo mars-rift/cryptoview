@@ -1,0 +1,97 @@
+<Window x:Class="cryptoview.Windows.PriceAlertDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Create Price Alert" Height="300" Width="400"
+        Background="#0F0F17" WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <Style x:Key="CyberpunkButton" TargetType="Button">
+            <Setter Property="Background" Value="#120458"/>
+            <Setter Property="Foreground" Value="#00FF9C"/>
+            <Setter Property="BorderBrush" Value="#00FF9C"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#2E0F89"/>
+                    <Setter Property="Foreground" Value="#00FFFF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#00FF9C"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+        </Style>
+        
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#120458"/>
+            <Setter Property="Foreground" Value="#00FF9C"/>
+            <Setter Property="BorderBrush" Value="#00FF9C"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="Padding" Value="5"/>
+        </Style>
+        
+        <Style TargetType="RadioButton">
+            <Setter Property="Foreground" Value="#00FF9C"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+        </Style>
+    </Window.Resources>
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <TextBlock Grid.Row="0" Text="Create Price Alert" FontSize="16" FontWeight="Bold" 
+                   HorizontalAlignment="Center" Margin="0,0,0,20" Foreground="#00FFFF"/>
+        
+        <TextBlock Grid.Row="1" x:Name="SymbolTextBlock" FontWeight="Bold" Margin="0,0,0,10"/>
+        
+        <TextBlock Grid.Row="2" x:Name="CurrentPriceTextBlock" Margin="0,0,0,10"/>
+        
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="Alert Type:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <RadioButton x:Name="AboveRadioButton" Content="Above" IsChecked="True" Margin="0,0,15,0"/>
+            <RadioButton x:Name="BelowRadioButton" Content="Below"/>
+        </StackPanel>
+        
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="Target Price: $" VerticalAlignment="Center" Margin="0,0,5,0"/>
+            <TextBox x:Name="TargetPriceTextBox" Width="100" VerticalAlignment="Center"/>
+        </StackPanel>
+        
+        <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,0,0,15">
+            <Button Content="5% Above" Style="{StaticResource CyberpunkButton}" Click="QuickAbove5_Click" Margin="0,0,5,0"/>
+            <Button Content="10% Above" Style="{StaticResource CyberpunkButton}" Click="QuickAbove10_Click" Margin="0,0,5,0"/>
+            <Button Content="5% Below" Style="{StaticResource CyberpunkButton}" Click="QuickBelow5_Click" Margin="0,0,5,0"/>
+            <Button Content="10% Below" Style="{StaticResource CyberpunkButton}" Click="QuickBelow10_Click"/>
+        </StackPanel>
+        
+        <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="CREATE ALERT" Style="{StaticResource CyberpunkButton}" 
+                    Click="CreateAlert_Click" Margin="0,0,10,0"/>
+            <Button Content="CANCEL" Style="{StaticResource CyberpunkButton}" 
+                    Click="Cancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

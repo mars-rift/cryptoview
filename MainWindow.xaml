@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:cryptoview"
         mc:Ignorable="d"
-        Title="CryptoView" Height="600" Width="900"
+        Title="CryptoView Pro" Height="700" Width="1200"
         Background="#0F0F17">
     <Window.Resources>
         <Style x:Key="CyberpunkButton" TargetType="Button">
@@ -34,10 +34,25 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        
+        <Style x:Key="SmallCyberpunkButton" TargetType="Button" BasedOn="{StaticResource CyberpunkButton}">
+            <Setter Property="Padding" Value="5,2"/>
+            <Setter Property="FontSize" Value="10"/>
+        </Style>
+        
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="#00FF9C"/>
             <Setter Property="FontFamily" Value="Consolas"/>
         </Style>
+        
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#120458"/>
+            <Setter Property="Foreground" Value="#00FF9C"/>
+            <Setter Property="BorderBrush" Value="#00FF9C"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="Padding" Value="5"/>
+        </Style>
+        
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="#120458"/>
             <Setter Property="Foreground" Value="#00FF9C"/>
@@ -80,7 +95,6 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="20"/>
                                                 </Grid.ColumnDefinitions>
-                                                <!-- Use a TextBlock instead of ContentPresenter for explicit foreground control -->
                                                 <TextBlock
                                             Grid.Column="0"
                                             Text="{Binding Path=SelectionBoxItem, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type ComboBox}}}"
@@ -178,50 +192,181 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/> <!-- New row for progress bar -->
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- Title -->
-            <TextBlock Text="CRYPTOVIEW" FontSize="32" FontWeight="Bold" Margin="10" HorizontalAlignment="Center">
+            <TextBlock Text="CRYPTOVIEW PRO" FontSize="32" FontWeight="Bold" Margin="10" HorizontalAlignment="Center">
                 <TextBlock.Effect>
                     <DropShadowEffect Color="#00FFFF" BlurRadius="10" ShadowDepth="0"/>
                 </TextBlock.Effect>
             </TextBlock>
 
-            <!-- Exchange selection and load button -->
+            <!-- Exchange selection and controls -->
             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,10">
-                <TextBlock Text="Select Exchange:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBlock Text="Exchange:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 <ComboBox x:Name="ExchangesComboBox" Width="200" Margin="0,0,10,0"/>
-                <Button x:Name="LoadExchangeButton" Content="LOAD DATA" Style="{StaticResource CyberpunkButton}" Click="LoadExchangeButton_Click"/>
+                <Button x:Name="LoadExchangeButton" Content="LOAD DATA" Style="{StaticResource CyberpunkButton}" Click="LoadExchangeButton_Click" Margin="0,0,10,0"/>
+                <Button x:Name="LoadMoreExchangesButton" Content="ADD EXCHANGES" Style="{StaticResource CyberpunkButton}" Click="LoadMoreExchangesButton_Click" Margin="0,0,10,0"/>
+                <Button x:Name="RefreshButton" Content="REFRESH" Style="{StaticResource CyberpunkButton}" Click="RefreshButton_Click" Margin="0,0,10,0"/>
+                <CheckBox x:Name="AutoRefreshCheckBox" Content="Auto Refresh" VerticalAlignment="Center" Foreground="#00FF9C" Margin="0,0,10,0" Checked="AutoRefreshCheckBox_Checked" Unchecked="AutoRefreshCheckBox_Unchecked"/>
+            </StackPanel>
+
+            <!-- Search and filter controls -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
+                <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBox x:Name="SearchTextBox" Width="150" Margin="0,0,10,0" TextChanged="SearchTextBox_TextChanged"/>
+                <CheckBox x:Name="FavoritesOnlyCheckBox" Content="Favorites Only" VerticalAlignment="Center" Foreground="#00FF9C" Margin="0,0,10,0" Checked="FavoritesOnlyCheckBox_Checked" Unchecked="FavoritesOnlyCheckBox_Unchecked"/>
+                <Button x:Name="ExportButton" Content="EXPORT" Style="{StaticResource CyberpunkButton}" Click="ExportButton_Click" Margin="0,0,10,0"/>
+                <Button x:Name="SettingsButton" Content="SETTINGS" Style="{StaticResource CyberpunkButton}" Click="SettingsButton_Click"/>
             </StackPanel>
 
             <!-- Progress Bar and Loading Indicator -->
-            <Grid Grid.Row="2" Margin="10,0,10,10" Visibility="Collapsed" x:Name="LoadingGrid">
+            <Grid Grid.Row="3" Margin="10,0,10,10" Visibility="Collapsed" x:Name="LoadingGrid">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <TextBlock x:Name="LoadingStatusTextBlock" Text="Filtering exchanges..." Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                <TextBlock x:Name="LoadingStatusTextBlock" Text="Loading..." Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,5"/>
                 <ProgressBar x:Name="LoadingProgressBar" Grid.Row="1" Height="10" Minimum="0" Maximum="100" Value="0" Background="#1A1A2E" Foreground="#00FF9C" BorderBrush="#00FFFF"/>
             </Grid>
 
-            <!-- Data grid for trading pairs -->
-            <DataGrid x:Name="PairsDataGrid" Grid.Row="3" Margin="10" AutoGenerateColumns="False" IsReadOnly="True">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="BASE" Binding="{Binding Base}" Width="*"/>
-                    <DataGridTextColumn Header="QUOTE" Binding="{Binding Quote}" Width="*"/>
-                    <DataGridTextColumn Header="PRICE (USD)" Binding="{Binding PriceUsd, StringFormat={}{0:N2}}" Width="*"/>
-                    <DataGridTextColumn Header="VOLUME" Binding="{Binding Volume, StringFormat={}{0:N2}}" Width="*"/>
-                    <DataGridTextColumn Header="TIME" Binding="{Binding FormattedTime}" Width="*"/>
-                </DataGrid.Columns>
-            </DataGrid>
+            <!-- Main content area with tabs -->
+            <TabControl Grid.Row="4" Margin="10" Background="#0F0F17" BorderBrush="#00FF9C">
+                <TabControl.Resources>
+                    <Style TargetType="TabItem">
+                        <Setter Property="Background" Value="#120458"/>
+                        <Setter Property="Foreground" Value="#00FF9C"/>
+                        <Setter Property="FontFamily" Value="Consolas"/>
+                        <Setter Property="FontWeight" Value="Bold"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#2E0F89"/>
+                                <Setter Property="Foreground" Value="#00FFFF"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TabControl.Resources>
+
+                <!-- Trading Pairs Tab -->
+                <TabItem Header="TRADING PAIRS">
+                    <DataGrid x:Name="PairsDataGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserSortColumns="True" SelectionChanged="PairsDataGrid_SelectionChanged">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="★" Width="30">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="★" Style="{StaticResource SmallCyberpunkButton}" Click="FavoriteButton_Click" Tag="{Binding Symbol}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="BASE" Binding="{Binding Base}" Width="*"/>
+                            <DataGridTextColumn Header="QUOTE" Binding="{Binding Quote}" Width="*"/>
+                            <DataGridTemplateColumn Header="PRICE (USD)" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding PriceUsd, StringFormat={}{0:N2}}" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding PriceChangeIndicator}" Margin="5,0,0,0" VerticalAlignment="Center" FontWeight="Bold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding PriceChangeIndicator}" Value="▲">
+                                                                <Setter Property="Foreground" Value="LightGreen"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding PriceChangeIndicator}" Value="▼">
+                                                                <Setter Property="Foreground" Value="LightCoral"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="VOLUME" Binding="{Binding Volume, StringFormat={}{0:N2}}" Width="*"/>
+                            <DataGridTextColumn Header="TIME" Binding="{Binding FormattedTime}" Width="*"/>
+                            <DataGridTemplateColumn Header="ALERT" Width="60">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="🔔" Style="{StaticResource SmallCyberpunkButton}" Click="AlertButton_Click" Tag="{Binding Symbol}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </TabItem>
+
+                <!-- Alerts Tab -->
+                <TabItem Header="PRICE ALERTS">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10">
+                            <TextBlock Text="Active Alerts:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="Bold"/>
+                            <Button x:Name="ClearAlertsButton" Content="CLEAR ALL" Style="{StaticResource CyberpunkButton}" Click="ClearAlertsButton_Click"/>
+                        </StackPanel>
+                        
+                        <DataGrid x:Name="AlertsDataGrid" Grid.Row="1" Margin="10" AutoGenerateColumns="False" IsReadOnly="True">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="SYMBOL" Binding="{Binding Symbol}" Width="*"/>
+                                <DataGridTextColumn Header="TARGET PRICE" Binding="{Binding TargetPrice, StringFormat={}{0:N2}}" Width="*"/>
+                                <DataGridTextColumn Header="TYPE" Binding="{Binding Type}" Width="*"/>
+                                <DataGridTextColumn Header="CREATED" Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Width="*"/>
+                                <DataGridTemplateColumn Header="ACTION" Width="80">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="DELETE" Style="{StaticResource SmallCyberpunkButton}" Click="DeleteAlertButton_Click" Tag="{Binding}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+
+                <!-- Favorites Tab -->
+                <TabItem Header="FAVORITES">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        
+                        <TextBlock Grid.Row="0" Text="Favorite Trading Pairs (from all exchanges)" 
+                                   Margin="10" FontWeight="Bold" Foreground="#00FFFF"/>
+                        
+                        <DataGrid x:Name="FavoritesDataGrid" Grid.Row="1" Margin="10" AutoGenerateColumns="False" IsReadOnly="True">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="SYMBOL" Binding="{Binding Symbol}" Width="*"/>
+                                <DataGridTextColumn Header="BASE" Binding="{Binding Base}" Width="*"/>
+                                <DataGridTextColumn Header="QUOTE" Binding="{Binding Quote}" Width="*"/>
+                                <DataGridTextColumn Header="LAST PRICE" Binding="{Binding PriceUsd, StringFormat={}{0:N2}}" Width="*"/>
+                                <DataGridTextColumn Header="SAVED FROM" Binding="{Binding FormattedTime}" Width="*"/>
+                                <DataGridTemplateColumn Header="REMOVE" Width="80">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="REMOVE" Style="{StaticResource SmallCyberpunkButton}" Click="RemoveFavoriteButton_Click" Tag="{Binding Symbol}"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+            </TabControl>
 
             <!-- Info and status -->
-            <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="10">
+            <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="10">
                 <TextBlock x:Name="ExchangeInfoTextBlock" Margin="0,0,10,0"/>
                 <TextBlock x:Name="StatusTextBlock" HorizontalAlignment="Right" Margin="10,0,0,0"/>
+                <TextBlock x:Name="LastUpdateTextBlock" HorizontalAlignment="Right" Margin="10,0,0,0"/>
             </StackPanel>
         </Grid>
     </Border>
