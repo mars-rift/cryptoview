@@ -23,7 +23,7 @@ namespace cryptoview
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, IDisposable
     {
         private static readonly HttpClient _httpClient = new HttpClient();
         private readonly Dictionary<string, string> _exchangeMap = new();
@@ -413,7 +413,7 @@ namespace cryptoview
             _pairsViewSource?.View.Refresh();
             
             // Update favorite button states after a short delay to allow DataGrid to render
-            Dispatcher.BeginInvoke(new Action(() => UpdateFavoriteButtonStates()), System.Windows.Threading.DispatcherPriority.Loaded);
+            _ = Dispatcher.BeginInvoke(new Action(() => UpdateFavoriteButtonStates()), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void UpdateFavoriteButtonStates()
@@ -688,8 +688,9 @@ namespace cryptoview
 
             LoadExchangeButton.IsEnabled = false;
             try
-            {                string? exchangeName = ExchangesComboBox.SelectedItem?.ToString();
-                if (exchangeName != null && _exchangeMap.TryGetValue(exchangeName, out string exchangeId))
+            {
+                string? exchangeName = ExchangesComboBox.SelectedItem?.ToString();
+                if (exchangeName != null && _exchangeMap.TryGetValue(exchangeName, out string? exchangeId))
                 {
                     await LoadExchangeDataAsync(exchangeId);
                 }
@@ -943,6 +944,20 @@ namespace cryptoview
                     var alertDialog = new PriceAlertDialog(symbol, currentPair.PriceUsd);
                     if (alertDialog.ShowDialog() == true)
                     {
+                        // Check for duplicate alerts
+                        var existingAlert = _priceAlerts.FirstOrDefault(a => 
+                            a.Symbol == symbol && 
+                            a.TargetPrice == alertDialog.TargetPrice && 
+                            a.Type == alertDialog.AlertType &&
+                            a.IsEnabled);
+
+                        if (existingAlert != null)
+                        {
+                            MessageBox.Show($"An identical alert already exists for {symbol} at ${alertDialog.TargetPrice:N2} {(alertDialog.AlertType == AlertType.Above ? "above" : "below")}", 
+                                          "Duplicate Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+
                         var alert = new PriceAlert
                         {
                             Symbol = symbol,
@@ -1040,8 +1055,18 @@ namespace cryptoview
                 
                 foreach (var favorite in detailedFavorites)
                 {
+                    // Update with current price data if available
+                    var currentPair = _allPairs.FirstOrDefault(p => $"{p.Base}/{p.Quote}" == favorite.Symbol);
+                    if (currentPair != null)
+                    {
+                        // Update prices with current exchange data
+                        favorite.Price = currentPair.Price;
+                        favorite.PriceUsd = currentPair.PriceUsd;
+                        favorite.Volume = currentPair.Volume;
+                    }
+                    
                     _favoritePairs.Add(favorite);
-                    System.Diagnostics.Debug.WriteLine($"Added favorite to UI: {favorite.Symbol}");
+                    System.Diagnostics.Debug.WriteLine($"Added favorite to UI: {favorite.Symbol} - Price: ${favorite.PriceUsd:N2}");
                 }
                 
                 // Also add any current pairs that are favorites but might not be in the detailed list yet
@@ -1132,9 +1157,12 @@ namespace cryptoview
 
                 var triggeredAlerts = new List<PriceAlert>();
 
-                foreach (var alert in _priceAlerts.ToList())
+                // Create a copy of the alerts to avoid collection modification during enumeration
+                var alertsCopy = _priceAlerts.ToList();
+
+                foreach (var alert in alertsCopy)
                 {
-                    if (!alert.IsEnabled) continue;
+                    if (!alert.IsEnabled || alert == null) continue;
 
                     // Find the current price for this symbol
                     var currentPair = _allPairs.FirstOrDefault(p => $"{p.Base}/{p.Quote}" == alert.Symbol);
@@ -1154,13 +1182,12 @@ namespace cryptoview
                     {
                         triggeredAlerts.Add(alert);
                         
-                        // Disable the alert so it doesn't trigger again
-                        alert.IsEnabled = false;
-                        await _dataService.UpdatePriceAlertAsync(alert);
+                        // Delete the alert from database and remove from collection
+                        await _dataService.DeletePriceAlertAsync(alert);
                     }
                 }
 
-                // Show triggered alerts on the UI thread
+                // Show triggered alerts on the UI thread and remove from collection
                 if (triggeredAlerts.Count > 0)
                 {
                     Dispatcher.Invoke(() =>
@@ -1172,14 +1199,13 @@ namespace cryptoview
                                          $"Symbol: {alert.Symbol}\n" +
                                          $"Target: ${alert.TargetPrice:N2} ({(alert.Type == AlertType.Above ? "Above" : "Below")})\n" +
                                          $"Current: ${currentPair?.PriceUsd:N2}\n\n" +
-                                         $"Alert has been disabled.";
+                                         $"Alert has been removed.";
                             
                             MessageBox.Show(message, "Price Alert", MessageBoxButton.OK, MessageBoxImage.Information);
+                            
+                            // Remove from the UI collection
+                            _priceAlerts.Remove(alert);
                         }
-                        
-                        // Refresh the alerts view to show disabled alerts
-                        var view = CollectionViewSource.GetDefaultView(_priceAlerts);
-                        view?.Refresh();
                     });
                 }
             }
@@ -1188,5 +1214,37 @@ namespace cryptoview
                 System.Diagnostics.Debug.WriteLine($"Error in price alert monitoring: {ex.Message}");
             }
         }
+
+        #region IDisposable Implementation
+        private bool _disposed = false;
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Dispose managed resources
+                    _refreshTimer?.Stop();
+                    _refreshTimer?.Dispose();
+                    _priceAlertTimer?.Stop();
+                    _priceAlertTimer?.Dispose();
+                    _httpClient?.Dispose();
+                }
+                _disposed = true;
+            }
+        }
+
+        ~MainWindow()
+        {
+            Dispose(false);
+        }
+        #endregion
     }
 }

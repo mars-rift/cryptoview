@@ -20,8 +20,18 @@ namespace cryptoview.Services
             _connectionString = $"Data Source={_dbPath}";
             InitializeDatabase();
             
-            // Clean up any invalid entries after initialization
-            Task.Run(async () => await CleanupFavoritesAsync());
+            // Clean up any invalid entries after initialization (fire-and-forget with error handling)
+            _ = Task.Run(async () => 
+            {
+                try 
+                { 
+                    await CleanupFavoritesAsync(); 
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error during cleanup: {ex.Message}");
+                }
+            });
         }
 
         public Task ResetDatabaseAsync()

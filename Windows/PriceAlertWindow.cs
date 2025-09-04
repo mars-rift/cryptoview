@@ -6,8 +6,6 @@ namespace cryptoview
 {
     public partial class PriceAlertWindow : Window
     {
-        private PriceAlert? _alert;
-
         public PriceAlertWindow(string symbol)
         {
             InitializeComponent();
@@ -18,7 +16,8 @@ namespace cryptoview
 
         public PriceAlert? GetAlert()
         {
-            return _alert;
+            // This appears to be unused dead code - returning null
+            return null;
         }
 
         private void InitializeComponent()
