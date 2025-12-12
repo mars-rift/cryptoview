@@ -153,8 +153,7 @@ namespace cryptoview.Models
 
     public class UserSettings
     {
-        public int RefreshInterval { get; set; } = 30; // seconds
-        public bool AutoRefresh { get; set; } = false;
+        // Refresh interval and auto-refresh settings were removed; use manual refresh via 'LOAD DATA'
         public string Theme { get; set; } = "Cyberpunk";
         public bool SoundAlertsEnabled { get; set; } = true;
         public List<string> FavoriteSymbols { get; set; } = new();

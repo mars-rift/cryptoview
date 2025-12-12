@@ -26,12 +26,26 @@ namespace cryptoview.Services
                 try 
                 { 
                     await CleanupFavoritesAsync(); 
+                    await RemoveLegacySettingsAsync();
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"Error during cleanup: {ex.Message}");
                 }
             });
+        }
+
+        // Delete a specific setting record
+        public async Task DeleteSettingAsync(string key)
+        {
+            using var connection = new SQLiteConnection(_connectionString);
+            await connection.OpenAsync();
+
+            var sql = "DELETE FROM Settings WHERE Key = @Key";
+            using var command = new SQLiteCommand(sql, connection);
+            command.Parameters.AddWithValue("@Key", key);
+
+            await command.ExecuteNonQueryAsync();
         }
 
         public Task ResetDatabaseAsync()
@@ -588,6 +602,23 @@ namespace cryptoview.Services
 
             var result = await command.ExecuteScalarAsync();
             return result?.ToString();
+        }
+
+        // Remove legacy keys that are no longer used by the app
+        private async Task RemoveLegacySettingsAsync()
+        {
+            try
+            {
+                // Remove old keys related to auto-refresh behavior
+                await DeleteSettingAsync("AutoRefresh");
+                await DeleteSettingAsync("RefreshInterval");
+
+                System.Diagnostics.Debug.WriteLine("Removed legacy settings keys: AutoRefresh, RefreshInterval");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error removing legacy settings: {ex.Message}");
+            }
         }
     }
 }

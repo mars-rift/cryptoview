@@ -34,12 +34,12 @@ namespace cryptoview
         private readonly ObservableCollection<TradingPair> _filteredPairs = new();
         private readonly ObservableCollection<PriceAlert> _priceAlerts = new();
         private readonly ObservableCollection<TradingPair> _favoritePairs = new();
-        private readonly System.Timers.Timer _refreshTimer = new();
         private readonly System.Timers.Timer _priceAlertTimer = new();
         private CollectionViewSource? _pairsViewSource;
         private List<string> _favoriteSymbols = new();
         private string _currentSearchText = "";
         private bool _showFavoritesOnly = false;
+        private bool _suppressSelectionChanged = false;
 
         public MainWindow()
         {
@@ -100,7 +100,9 @@ namespace cryptoview
                     {
                         _exchangeMap.Add(exchange.Name, exchange.Id);
                         ExchangesComboBox.Items.Add(exchange.Name);
+                        _suppressSelectionChanged = true;
                         ExchangesComboBox.SelectedIndex = 0;
+                        _suppressSelectionChanged = false;
                         
                         StatusTextBlock.Text = $"Loading {exchange.Name} data...";
                         await LoadExchangeDataAsync(exchange.Id);
@@ -651,7 +653,9 @@ namespace cryptoview
                             // Keep the current selection if it exists
                             if (ExchangesComboBox.SelectedIndex < 0)
                             {
+                                _suppressSelectionChanged = true;
                                 ExchangesComboBox.SelectedIndex = 0;
+                                _suppressSelectionChanged = false;
                             }
                             StatusTextBlock.Text = $"Ready - {validExchanges} exchanges available";
                         }
@@ -708,7 +712,7 @@ namespace cryptoview
             {
                 StatusTextBlock.Text = "Loading additional exchanges...";
                 await LoadExchangesAsync();
-                StatusTextBlock.Text = $"Loaded {ExchangesComboBox.Items.Count} total exchanges. Select any exchange and click 'LOAD DATA'.";
+                StatusTextBlock.Text = $"Loaded {ExchangesComboBox.Items.Count} total exchanges. Select any exchange to load data.";
             }
             catch (Exception ex)
             {
@@ -794,10 +798,7 @@ namespace cryptoview
         }
 
         // Enhanced event handlers for new features
-        private async void RefreshButton_Click(object sender, RoutedEventArgs e)
-        {
-            await RefreshCurrentData();
-        }
+        // NOTE: Refresh button removed - use Load Data button or select a new exchange.
 
         private async Task RefreshCurrentData()
         {
@@ -812,16 +813,14 @@ namespace cryptoview
             }
         }
 
-        private void AutoRefreshCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            _refreshTimer.Start();
-            StatusTextBlock.Text = "Auto-refresh enabled";
-        }
+        // Auto-refresh removed; leaving methods out to simplify maintainability
 
-        private void AutoRefreshCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        private async void ExchangesComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            _refreshTimer.Stop();
-            StatusTextBlock.Text = "Auto-refresh disabled";
+            if (_suppressSelectionChanged) return;
+
+            // Auto-load exchange data when a new selection is made
+            await RefreshCurrentData();
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -1231,8 +1230,7 @@ namespace cryptoview
                 if (disposing)
                 {
                     // Dispose managed resources
-                    _refreshTimer?.Stop();
-                    _refreshTimer?.Dispose();
+                    // _refreshTimer removed; no auto-refresh cleanup needed
                     _priceAlertTimer?.Stop();
                     _priceAlertTimer?.Dispose();
                     _httpClient?.Dispose();

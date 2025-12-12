@@ -208,11 +208,10 @@
             <!-- Exchange selection and controls -->
             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,10">
                 <TextBlock Text="Exchange:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <ComboBox x:Name="ExchangesComboBox" Width="200" Margin="0,0,10,0"/>
+                <ComboBox x:Name="ExchangesComboBox" Width="200" Margin="0,0,10,0" SelectionChanged="ExchangesComboBox_SelectionChanged"/>
                 <Button x:Name="LoadExchangeButton" Content="LOAD DATA" Style="{StaticResource CyberpunkButton}" Click="LoadExchangeButton_Click" Margin="0,0,10,0"/>
                 <Button x:Name="LoadMoreExchangesButton" Content="ADD EXCHANGES" Style="{StaticResource CyberpunkButton}" Click="LoadMoreExchangesButton_Click" Margin="0,0,10,0"/>
-                <Button x:Name="RefreshButton" Content="REFRESH" Style="{StaticResource CyberpunkButton}" Click="RefreshButton_Click" Margin="0,0,10,0"/>
-                <CheckBox x:Name="AutoRefreshCheckBox" Content="Auto Refresh" VerticalAlignment="Center" Foreground="#00FF9C" Margin="0,0,10,0" Checked="AutoRefreshCheckBox_Checked" Unchecked="AutoRefreshCheckBox_Unchecked"/>
+                <!-- Refresh button and auto-refresh checkbox removed; use Load Data to refresh -->
             </StackPanel>
 
             <!-- Search and filter controls -->

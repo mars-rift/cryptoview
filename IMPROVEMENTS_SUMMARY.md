@@ -6,7 +6,7 @@
 |---------|-------------------|----------------|
 | **Window Size** | 900x600 | 1200x700 |
 | **Layout** | Single view | Tabbed interface |
-| **Data Refresh** | Manual only | Manual + Auto-refresh |
+| **Data Refresh** | Manual only | Manual only |
 | **Search** | ❌ None | ✅ Real-time search |
 | **Favorites** | ❌ None | ✅ Persistent favorites |
 | **Price Alerts** | ❌ None | ✅ Custom alerts |
@@ -20,7 +20,7 @@
 ### Enhanced Header
 ```
 [CRYPTOVIEW PRO]
-Exchange: [Dropdown] [LOAD DATA] [REFRESH] [✓ Auto Refresh]
+Exchange: [Dropdown] [LOAD DATA]
 Search: [______] [✓ Favorites Only] [EXPORT] [SETTINGS]
 ```
 
@@ -119,7 +119,7 @@ CREATE TABLE Settings (
 
 ### User Experience
 - **Responsive UI**: Smooth interactions
-- **Real-time Updates**: Live data refresh
+- **Real-time Updates**: Manual refresh via 'LOAD DATA' and Last Update timestamp
 - **Error Recovery**: Graceful error handling
 - **Data Persistence**: Settings saved between sessions
 
@@ -143,7 +143,7 @@ CREATE TABLE Settings (
 ### For Users:
 - **50% More Screen Real Estate**: Larger interface
 - **3x More Features**: Favorites, alerts, export
-- **Real-time Monitoring**: Auto-refresh capability
+- **Real-time Monitoring**: Manual data load via 'LOAD DATA' and Last Update timestamp
 - **Data Persistence**: No loss of preferences
 - **Better Organization**: Tabbed interface
 

@@ -8,12 +8,11 @@ CryptoView Pro is an enhanced version of the original CryptoView application wit
 ### 1. **Enhanced User Interface**
 - **Larger Window Size**: Increased from 900x600 to 1200x700 pixels
 - **Tabbed Interface**: Organized content into Trading Pairs, Price Alerts, and Favorites tabs
-- **Advanced Controls**: Added search, filters, auto-refresh, and export functionality
+- **Advanced Controls**: Added search, filters, and export functionality
 - **Enhanced Styling**: Improved button styles and color schemes
 
-### 2. **Real-time Data Management**
-- **Auto-refresh**: Optional automatic data refresh every 30 seconds
-- **Manual Refresh**: Dedicated refresh button for on-demand updates
+-### 2. **Real-time Data Management**
+- **Manual Refresh**: Use the 'LOAD DATA' button to refresh the currently selected exchange
 - **Last Update Timestamp**: Shows when data was last refreshed
 - **Price Change Indicators**: Visual indicators (▲▼) for price movements
 
@@ -105,10 +104,9 @@ CREATE TABLE Settings (
 ## 🔧 Usage Instructions
 
 ### Basic Operations
-1. **Select Exchange**: Choose from the dropdown (auto-filtered for valid exchanges)
-2. **Load Data**: Click "LOAD DATA" to fetch trading pairs
-3. **Auto-refresh**: Enable checkbox for automatic updates
-4. **Search**: Type in search box to filter pairs
+1. **Select Exchange**: Choose from the dropdown (auto-filtered for valid exchanges) — exchange data loads automatically when selected
+2. **Load Data**: Click "LOAD DATA" to manually refresh trading pairs for the currently selected exchange
+3. **Search**: Type in search box to filter pairs
 
 ### Advanced Features
 1. **Add to Favorites**: Click ★ button next to any trading pair

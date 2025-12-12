@@ -10,14 +10,14 @@ A comprehensive desktop application built with WPF/.NET that displays cryptocurr
 - **Live Exchange Data**: Fetch cryptocurrency exchange information from the Coinlore API
 - **Multiple Exchange Support**: View trading pairs from various exchanges with smart filtering
 - **Robust Parsing**: Handles multiple API response formats with fallback mechanisms
-- **Real-time Updates**: Auto-refresh with configurable intervals and manual refresh options
+- **Real-time Updates**: Manual refresh via 'LOAD DATA' and last update timestamp
 
 ### Advanced Features
 - **🌟 Favorites System**: Mark and manage favorite trading pairs with persistent storage
 - **🔔 Price Alerts**: Set custom price alerts with above/below target notifications
 - **🔍 Search & Filter**: Real-time search and filtering capabilities
 - **📊 Data Export**: Export data to CSV format with timestamped files
-- **⏱️ Auto-Refresh**: Configurable automatic data updates every 30 seconds
+- **⏱️ Auto-Refresh**: Removed from the UI; use 'LOAD DATA' to refresh exchange data
 - **📈 Price Indicators**: Visual price change indicators (▲▼) for trend tracking
 
 ### User Interface
@@ -66,8 +66,8 @@ A comprehensive desktop application built with WPF/.NET that displays cryptocurr
 ### Basic Operations
 1. **Initial Setup**: The application automatically loads and filters valid exchanges on startup
 2. **Select Exchange**: Choose an exchange from the dropdown menu
-3. **Load Data**: Click "LOAD DATA" to fetch trading pairs for the selected exchange
-4. **Auto-Refresh**: Enable the auto-refresh checkbox for continuous updates
+3. **Select Exchange**: Choose an exchange from the dropdown to auto-load data
+4. **Load Data**: Click "LOAD DATA" to manually refresh data for the currently selected exchange
 5. **Search**: Use the search box to filter trading pairs by symbol or name
 
 ### Advanced Features
@@ -87,7 +87,7 @@ A comprehensive desktop application built with WPF/.NET that displays cryptocurr
 
 4. **Settings**:
    - Access application settings via the "SETTINGS" button
-   - Configure refresh intervals and other preferences
+   - Configure other preferences
 
 ## 📁 File Structure
 
