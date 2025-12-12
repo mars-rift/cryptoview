@@ -64,7 +64,7 @@ A comprehensive desktop application built with WPF/.NET that displays cryptocurr
 ## 🎯 Usage Guide
 
 ### Basic Operations
-1. **Initial Setup**: The application automatically loads and filters valid exchanges on startup
+1. **Initial Setup**: The application automatically loads and filters valid exchanges on startup; Binance is the preferred default when available
 2. **Select Exchange**: Choose an exchange from the dropdown menu
 3. **Select Exchange**: Choose an exchange from the dropdown to auto-load data
 4. **Load Data**: Click "LOAD DATA" to manually refresh data for the currently selected exchange
@@ -88,6 +88,7 @@ A comprehensive desktop application built with WPF/.NET that displays cryptocurr
 4. **Settings**:
    - Access application settings via the "SETTINGS" button
    - Configure other preferences
+   - Save Last Selected Exchange: Persist the currently selected exchange between application runs
 
 ## 📁 File Structure
 

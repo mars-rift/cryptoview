@@ -155,6 +155,7 @@ namespace cryptoview.Models
     {
         // Refresh interval and auto-refresh settings were removed; use manual refresh via 'LOAD DATA'
         public string Theme { get; set; } = "Cyberpunk";
+        public bool SaveLastSelectedExchange { get; set; } = false;
         public bool SoundAlertsEnabled { get; set; } = true;
         public List<string> FavoriteSymbols { get; set; } = new();
         public bool SaveToDatabase { get; set; } = true;

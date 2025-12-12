@@ -40,6 +40,7 @@ namespace cryptoview
         private string _currentSearchText = "";
         private bool _showFavoritesOnly = false;
         private bool _suppressSelectionChanged = false;
+        private bool _loadedLastSelectedExchange = false;
 
         public MainWindow()
         {
@@ -50,6 +51,58 @@ namespace cryptoview
             _priceAlertTimer.Interval = 30000; // 30 seconds
             _priceAlertTimer.Elapsed += PriceAlertTimer_Elapsed;
             _priceAlertTimer.Start();
+            // Try to load SaveLastSelectedExchange setting (moved to Loaded handler)
+        }
+
+        public string? GetCurrentSelectedExchangeName()
+        {
+            return ExchangesComboBox?.SelectedItem?.ToString();
+        }
+
+        private async System.Threading.Tasks.Task InitializeUserSettingsAsync()
+        {
+            try
+            {
+                var val = await _dataService.GetSettingAsync("SaveLastSelectedExchange");
+
+                // If enabled and we have a saved last exchange, try to load it on startup
+                if (!string.IsNullOrEmpty(val) && bool.TryParse(val, out bool enabled) && enabled)
+                {
+                    var last = await _dataService.GetSettingAsync("LastSelectedExchange");
+                    if (!string.IsNullOrEmpty(last))
+                    {
+                        // Try to resolve and load by name
+                        string? id = null;
+                        if (_exchangeMap.TryGetValue(last, out var existingId))
+                        {
+                            id = existingId;
+                        }
+                        else
+                        {
+                            // Try to resolve via API
+                            id = await GetExchangeIdByNameAsync(last);
+                            if (id != null)
+                            {
+                                _exchangeMap[last] = id;
+                                ExchangesComboBox.Items.Add(last);
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(id))
+                        {
+                            _suppressSelectionChanged = true;
+                            ExchangesComboBox.SelectedItem = last;
+                            _suppressSelectionChanged = false;
+                            await LoadExchangeDataAsync(id);
+                            _loadedLastSelectedExchange = true;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error initializing user settings: {ex.Message}");
+            }
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -62,9 +115,15 @@ namespace cryptoview
             
             // Load saved data from database
             await LoadDataFromService();
+
+            // Initialize user settings and try to load last selected exchange if enabled
+            await InitializeUserSettingsAsync();
             
-            // Default to Binance (exchange ID 2) for fast startup
-            await LoadDefaultExchange();
+            // Default to Binance (exchange ID 2) for fast startup if no last-selected exchange was loaded
+            if (!_loadedLastSelectedExchange)
+            {
+                await LoadDefaultExchange();
+            }
             
             LoadExchangeButton.IsEnabled = true;
             StatusTextBlock.Text = "Ready - Default exchange loaded. Use 'Add Exchanges' to add more options.";
@@ -89,6 +148,38 @@ namespace cryptoview
                 _exchangeMap.Clear();
                 ExchangesComboBox.Items.Clear();
 
+                // First, attempt to find Binance by name from the exchanges API and force it as the default
+                string? binanceId = await GetExchangeIdByNameAsync("Binance");
+                var forcedDefault = binanceId != null ? new { Name = "Binance", Id = binanceId } : defaultExchanges.FirstOrDefault(d => d.Name == "Binance");
+                if (forcedDefault != null)
+                {
+                    try
+                    {
+                        // Add Binance to the list and select it
+                        if (!_exchangeMap.ContainsKey(forcedDefault.Name))
+                        {
+                            _exchangeMap.Add(forcedDefault.Name, forcedDefault.Id);
+                            ExchangesComboBox.Items.Add(forcedDefault.Name);
+                        }
+                        _suppressSelectionChanged = true;
+                        ExchangesComboBox.SelectedItem = forcedDefault.Name;
+                        _suppressSelectionChanged = false;
+
+                        StatusTextBlock.Text = $"Loading {forcedDefault.Name} data...";
+                        await LoadExchangeDataAsync(forcedDefault.Id);
+                        StatusTextBlock.Text = $"Ready - {forcedDefault.Name} loaded. Use 'Add Exchanges' to see more options.";
+                        return; // Binance loaded successfully, prefer it as default
+                    }
+                    catch
+                    {
+                        // If Binance failed to load, remove it and continue
+                        if (_exchangeMap.ContainsKey(forcedDefault.Name))
+                            _exchangeMap.Remove(forcedDefault.Name);
+                        ExchangesComboBox.Items.Remove(forcedDefault.Name);
+                        StatusTextBlock.Text = $"Could not load {forcedDefault.Name} as default. Trying other exchanges...";
+                    }
+                }
+
                 foreach (var exchange in defaultExchanges)
                 {
                     StatusTextBlock.Text = $"Trying {exchange.Name}...";
@@ -100,8 +191,20 @@ namespace cryptoview
                     {
                         _exchangeMap.Add(exchange.Name, exchange.Id);
                         ExchangesComboBox.Items.Add(exchange.Name);
+                        // Prefer Binance if present, otherwise select the first item
                         _suppressSelectionChanged = true;
-                        ExchangesComboBox.SelectedIndex = 0;
+                        if (_exchangeMap.ContainsKey("Binance"))
+                        {
+                            int idx = ExchangesComboBox.Items.IndexOf("Binance");
+                            if (idx >= 0)
+                                ExchangesComboBox.SelectedIndex = idx;
+                            else
+                                ExchangesComboBox.SelectedIndex = 0;
+                        }
+                        else
+                        {
+                            ExchangesComboBox.SelectedIndex = 0;
+                        }
                         _suppressSelectionChanged = false;
                         
                         StatusTextBlock.Text = $"Loading {exchange.Name} data...";
@@ -654,7 +757,19 @@ namespace cryptoview
                             if (ExchangesComboBox.SelectedIndex < 0)
                             {
                                 _suppressSelectionChanged = true;
-                                ExchangesComboBox.SelectedIndex = 0;
+                                // Prefer Binance if present among the loaded exchanges
+                                if (_exchangeMap.ContainsKey("Binance"))
+                                {
+                                    int idx = ExchangesComboBox.Items.IndexOf("Binance");
+                                    if (idx >= 0)
+                                        ExchangesComboBox.SelectedIndex = idx;
+                                    else
+                                        ExchangesComboBox.SelectedIndex = 0;
+                                }
+                                else
+                                {
+                                    ExchangesComboBox.SelectedIndex = 0;
+                                }
                                 _suppressSelectionChanged = false;
                             }
                             StatusTextBlock.Text = $"Ready - {validExchanges} exchanges available";
@@ -680,6 +795,39 @@ namespace cryptoview
                 // Hide loading indicators
                 LoadingGrid.Visibility = Visibility.Collapsed;
             }
+        }
+
+        private async Task<string?> GetExchangeIdByNameAsync(string name)
+        {
+            try
+            {
+                string url = "https://api.coinlore.net/api/exchanges/";
+                HttpResponseMessage response = await _httpClient.GetAsync(url);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+
+                string json = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var exchanges = JsonSerializer.Deserialize<Dictionary<string, Exchange>>(json, options);
+
+                if (exchanges == null) return null;
+
+                foreach (var kvp in exchanges)
+                {
+                    if (!string.IsNullOrEmpty(kvp.Value.Name) && string.Equals(kvp.Value.Name, name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return kvp.Key; // return the ID
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetExchangeIdByNameAsync error: {ex.Message}");
+            }
+
+            return null;
         }
 
         private async void LoadExchangeButton_Click(object sender, RoutedEventArgs e)
@@ -821,6 +969,29 @@ namespace cryptoview
 
             // Auto-load exchange data when a new selection is made
             await RefreshCurrentData();
+
+            // Persist the last selected exchange if the user enabled the setting
+            try
+            {
+                var saveSettingVal = await _dataService.GetSettingAsync("SaveLastSelectedExchange");
+                if (!string.IsNullOrEmpty(saveSettingVal) && bool.TryParse(saveSettingVal, out bool enabled) && enabled)
+                {
+                    var exchangeName = ExchangesComboBox.SelectedItem?.ToString();
+                    if (!string.IsNullOrEmpty(exchangeName))
+                    {
+                        await _dataService.SaveSettingAsync("LastSelectedExchange", exchangeName);
+                    }
+                }
+                else
+                {
+                    // Remove any existing persisted last selection
+                    await _dataService.DeleteSettingAsync("LastSelectedExchange");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error saving last selected exchange: {ex.Message}");
+            }
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -1139,7 +1310,9 @@ namespace cryptoview
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Settings panel - Empty", "Settings", MessageBoxButton.OK, MessageBoxImage.Information);
+            var settingsWindow = new SettingsWindow();
+            settingsWindow.Owner = this;
+            settingsWindow.ShowDialog();
         }
 
         private void PairsDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)

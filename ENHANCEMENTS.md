@@ -1,3 +1,10 @@
+### 🔧 Usage Instructions
+
+### Basic Operations
+1. **Select Exchange**: Choose from the dropdown (auto-filtered for valid exchanges) — exchange data loads automatically when selected
+2. **Load Data**: Click "LOAD DATA" to manually refresh trading pairs for the currently selected exchange
+3. **Save Last Selected Exchange**: Toggle to persist your last-selected exchange between runs
+4. **Search**: Type in search box to filter pairs
 # CryptoView Pro - Enhanced Features
 
 ## 🎯 Overview
@@ -106,7 +113,8 @@ CREATE TABLE Settings (
 ### Basic Operations
 1. **Select Exchange**: Choose from the dropdown (auto-filtered for valid exchanges) — exchange data loads automatically when selected
 2. **Load Data**: Click "LOAD DATA" to manually refresh trading pairs for the currently selected exchange
-3. **Search**: Type in search box to filter pairs
+3. **Save Last Selected Exchange**: Toggle in Settings to persist your last selected exchange across runs
+4. **Search**: Type in search box to filter pairs
 
 ### Advanced Features
 1. **Add to Favorites**: Click ★ button next to any trading pair
