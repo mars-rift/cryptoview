@@ -331,7 +331,7 @@ namespace cryptoview
                             {
                                 if (exchangeData.Info != null && exchangeData.Info.TryGetValue("0", out var info) && info != null)
                                 {
-                                    ExchangeInfoTextBlock.Text = $"{info.Name} | Founded: {info.DateLive} | URL: {info.Url}";
+                                    ExchangeInfoTextBlock.Text = $"{info.Name} | URL: {info.Url}";
                                 }
                                 else
                                 {
@@ -638,7 +638,6 @@ namespace cryptoview
                     }
 
                     string exchangeName = "Unknown";
-                    string dateLive = "Unknown";
                     string url = "Unknown";
 
                     if (root.TryGetProperty("0", out JsonElement infoElement) &&
@@ -647,14 +646,11 @@ namespace cryptoview
                         if (infoElement.TryGetProperty("name", out JsonElement nameElem))
                             exchangeName = nameElem.GetString() ?? "Unknown";
 
-                        if (infoElement.TryGetProperty("date_live", out JsonElement dateElem))
-                            dateLive = dateElem.GetString() ?? "Unknown";
-
                         if (infoElement.TryGetProperty("url", out JsonElement urlElem))
                             url = urlElem.GetString() ?? "Unknown";
                     }
 
-                    ExchangeInfoTextBlock.Text = $"{exchangeName} | Founded: {dateLive} | URL: {url}";
+                    ExchangeInfoTextBlock.Text = $"{exchangeName} | URL: {url}";
                 }
 
                 if (pairs.Count > 0)

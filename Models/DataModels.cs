@@ -117,7 +117,12 @@ namespace cryptoview.Models
                 _infoCache = new Dictionary<string, ExchangeInfo?>();
                 if (ExtensionData != null && ExtensionData.TryGetValue("0", out var infoElement))
                 {
-                    var info = System.Text.Json.JsonSerializer.Deserialize<ExchangeInfo>(infoElement.GetRawText());
+                    var info = System.Text.Json.JsonSerializer.Deserialize<ExchangeInfo>(
+                        infoElement.GetRawText(),
+                        new System.Text.Json.JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
                     _infoCache.Add("0", info);
                 }
                 return _infoCache;
