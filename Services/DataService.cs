@@ -160,6 +160,18 @@ namespace cryptoview.Services
                     addCreatedAt.ExecuteNonQuery();
                     System.Diagnostics.Debug.WriteLine("Added CreatedAt column to Favorites table");
                 }
+                if (!existingColumns.Contains("exchangeid"))
+                {
+                    using var addExchangeId = new SQLiteCommand("ALTER TABLE Favorites ADD COLUMN ExchangeId TEXT", connection);
+                    addExchangeId.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine("Added ExchangeId column to Favorites table");
+                }
+                if (!existingColumns.Contains("pricetimestamp"))
+                {
+                    using var addPriceTimestamp = new SQLiteCommand("ALTER TABLE Favorites ADD COLUMN PriceTimestamp DATETIME", connection);
+                    addPriceTimestamp.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine("Added PriceTimestamp column to Favorites table");
+                }
                 
                 _migrationSuccessful = true;
                 System.Diagnostics.Debug.WriteLine("Database migration completed successfully");
@@ -182,7 +194,9 @@ namespace cryptoview.Services
                             Quote TEXT,
                             LastPrice DECIMAL,
                             LastExchange TEXT,
-                            CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+                            CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            ExchangeId TEXT,
+                            PriceTimestamp DATETIME
                         );
                     ";
                     
@@ -439,7 +453,7 @@ namespace cryptoview.Services
             return favorites;
         }
 
-        public async Task AddFavoriteAsync(string symbol, string? baseCurrency = null, string? quoteCurrency = null, decimal? lastPrice = null, string? exchange = null)
+        public async Task AddFavoriteAsync(string symbol, string? baseCurrency = null, string? quoteCurrency = null, decimal? lastPrice = null, string? exchange = null, string? exchangeId = null)
         {
             using var connection = new SQLiteConnection(_connectionString);
             await connection.OpenAsync();
@@ -464,9 +478,9 @@ namespace cryptoview.Services
 
             try
             {
-                // Try the full insert with all columns
-                var sql = @"INSERT OR REPLACE INTO Favorites (Symbol, Base, Quote, LastPrice, LastExchange, CreatedAt) 
-                           VALUES (@Symbol, @Base, @Quote, @LastPrice, @LastExchange, @CreatedAt)";
+                // Try the full insert with all columns including ExchangeId and PriceTimestamp
+                var sql = @"INSERT OR REPLACE INTO Favorites (Symbol, Base, Quote, LastPrice, LastExchange, CreatedAt, ExchangeId, PriceTimestamp) 
+                           VALUES (@Symbol, @Base, @Quote, @LastPrice, @LastExchange, @CreatedAt, @ExchangeId, @PriceTimestamp)";
                 using var command = new SQLiteCommand(sql, connection);
                 command.Parameters.AddWithValue("@Symbol", symbol);
                 command.Parameters.AddWithValue("@Base", baseCurrency ?? (object)DBNull.Value);
@@ -474,9 +488,11 @@ namespace cryptoview.Services
                 command.Parameters.AddWithValue("@LastPrice", lastPrice ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("@LastExchange", exchange ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("@CreatedAt", DateTime.Now);
+                command.Parameters.AddWithValue("@ExchangeId", exchangeId ?? (object)DBNull.Value);
+                command.Parameters.AddWithValue("@PriceTimestamp", DateTime.UtcNow);
 
                 await command.ExecuteNonQueryAsync();
-                System.Diagnostics.Debug.WriteLine($"Added favorite using enhanced insert: {symbol}");
+                System.Diagnostics.Debug.WriteLine($"Added favorite using enhanced insert: {symbol} (Exchange: {exchange}, ExchangeId: {exchangeId})");
             }
             catch (Exception ex) when (ex.Message.Contains("no column named") || ex.Message.Contains("no such column"))
             {
@@ -508,6 +524,58 @@ namespace cryptoview.Services
 
             var rowsAffected = await command.ExecuteNonQueryAsync();
             System.Diagnostics.Debug.WriteLine($"RemoveFavoriteAsync: Deleted {rowsAffected} rows for symbol {symbol}");
+        }
+
+        /// <summary>
+        /// Gets detailed favorite info including the exchange ID it was added from
+        /// </summary>
+        public async Task<Dictionary<string, (string? ExchangeId, DateTime? PriceTimestamp)>> GetFavoriteExchangeInfoAsync()
+        {
+            using var connection = new SQLiteConnection(_connectionString);
+            await connection.OpenAsync();
+
+            var favoriteExchanges = new Dictionary<string, (string?, DateTime?)>();
+
+            try
+            {
+                var sql = @"SELECT Symbol, ExchangeId, PriceTimestamp FROM Favorites";
+                using var command = new SQLiteCommand(sql, connection);
+                using var reader = await command.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
+                {
+                    var symbol = reader.GetString(0);
+                    var exchangeId = reader.IsDBNull(1) ? null : reader.GetString(1);
+                    var priceTimestamp = reader.IsDBNull(2) ? null : reader.GetDateTime(2) as DateTime?;
+                    
+                    favoriteExchanges[symbol] = (exchangeId, priceTimestamp);
+                }
+
+                System.Diagnostics.Debug.WriteLine($"Got exchange info for {favoriteExchanges.Count} favorites");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting favorite exchange info: {ex.Message}");
+            }
+
+            return favoriteExchanges;
+        }
+
+        /// <summary>
+        /// Gets the primary exchange ID for favorite prices (default for all favorites if not set individually)
+        /// </summary>
+        public async Task<string?> GetPrimaryExchangeForFavoritesAsync()
+        {
+            return await GetSettingAsync("PrimaryExchangeForFavorites");
+        }
+
+        /// <summary>
+        /// Sets the primary exchange for favorite prices
+        /// </summary>
+        public async Task SetPrimaryExchangeForFavoritesAsync(string exchangeId)
+        {
+            await SaveSettingAsync("PrimaryExchangeForFavorites", exchangeId);
+            System.Diagnostics.Debug.WriteLine($"Set primary exchange for favorites to: {exchangeId}");
         }
 
         public async Task CleanupFavoritesAsync()

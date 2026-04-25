@@ -469,6 +469,25 @@ namespace cryptoview
             return (currentTime - timestamp) > MAX_AGE_SECONDS;
         }
 
+        private bool IsPriceTimestampStale(DateTime? priceTimestamp)
+        {
+            if (priceTimestamp == null)
+                return true;
+
+            // If price is older than 1 hour, mark as stale
+            TimeSpan age = DateTime.UtcNow - priceTimestamp.Value;
+            return age.TotalSeconds > 3600; // 1 hour
+        }
+
+        private string FormatPriceWithStalenessIndicator(string basePrice, DateTime? priceTimestamp)
+        {
+            if (IsPriceTimestampStale(priceTimestamp))
+            {
+                return $"{basePrice} ⚠"; // Warning indicator for stale prices
+            }
+            return basePrice;
+        }
+
         private void ProcessPairsWithCurrentTime(List<TradingPair> pairs)
         {
             DateTime now = DateTime.Now;
@@ -1034,19 +1053,27 @@ namespace cryptoview
                         
                         // Find the current pair to get additional details
                         var currentPair = _allPairs.FirstOrDefault(p => $"{p.Base}/{p.Quote}" == symbol);
-                        string? currentExchange = "Unknown"; // Will fix control reference later
                         
-                        System.Diagnostics.Debug.WriteLine($"Adding {symbol} to favorites. Current pair found: {currentPair != null}");
+                        // Get current exchange info
+                        string? currentExchange = ExchangesComboBox?.SelectedItem?.ToString() ?? "Unknown";
+                        string? currentExchangeId = null;
+                        if (currentExchange != "Unknown" && _exchangeMap.TryGetValue(currentExchange, out var exchangeId))
+                        {
+                            currentExchangeId = exchangeId;
+                        }
+                        
+                        System.Diagnostics.Debug.WriteLine($"Adding {symbol} to favorites. Current pair found: {currentPair != null}, Exchange: {currentExchange} (ID: {currentExchangeId})");
                         
                         await _dataService.AddFavoriteAsync(
                             symbol, 
                             currentPair?.Base, 
                             currentPair?.Quote, 
                             currentPair?.PriceUsd, 
-                            currentExchange);
+                            currentExchange,
+                            currentExchangeId);
                         
                         button.Content = "★";
-                        System.Diagnostics.Debug.WriteLine($"Added {symbol} to favorites");
+                        System.Diagnostics.Debug.WriteLine($"Added {symbol} to favorites with exchange: {currentExchange}");
                     }
                     
                     // Refresh favorites tab
@@ -1215,20 +1242,81 @@ namespace cryptoview
                 
                 _favoritePairs.Clear();
                 
+                // Get current exchange from ComboBox
+                string? currentExchangeName = ExchangesComboBox.SelectedItem?.ToString();
+                string? currentExchangeId = null;
+                if (currentExchangeName != null && _exchangeMap.TryGetValue(currentExchangeName, out var exchangeId))
+                {
+                    currentExchangeId = exchangeId;
+                }
+
                 // Get all detailed favorites from database
                 var detailedFavorites = await _dataService.GetDetailedFavoritesAsync();
-                System.Diagnostics.Debug.WriteLine($"Got {detailedFavorites.Count} detailed favorites from database");
+                
+                // Get exchange info for each favorite
+                var favoriteExchangeInfo = await _dataService.GetFavoriteExchangeInfoAsync();
+                
+                // Get primary exchange setting
+                var primaryExchangeId = await _dataService.GetPrimaryExchangeForFavoritesAsync();
+                
+                System.Diagnostics.Debug.WriteLine($"Got {detailedFavorites.Count} detailed favorites. Primary exchange: {primaryExchangeId}, Current exchange: {currentExchangeId}");
                 
                 foreach (var favorite in detailedFavorites)
                 {
-                    // Update with current price data if available
-                    var currentPair = _allPairs.FirstOrDefault(p => $"{p.Base}/{p.Quote}" == favorite.Symbol);
-                    if (currentPair != null)
+                    // Check if we should update price from current data
+                    bool shouldUpdateFromCurrent = false;
+                    string? storedExchangeId = null;
+                    DateTime? priceTimestamp = null;
+                    
+                    if (favoriteExchangeInfo.TryGetValue(favorite.Symbol, out var exchangeInfo))
                     {
-                        // Update prices with current exchange data
-                        favorite.Price = currentPair.Price;
-                        favorite.PriceUsd = currentPair.PriceUsd;
-                        favorite.Volume = currentPair.Volume;
+                        storedExchangeId = exchangeInfo.Item1;
+                        priceTimestamp = exchangeInfo.Item2;
+                        
+                        // Only update if current exchange matches the stored exchange, or if it's the primary exchange
+                        if (!string.IsNullOrEmpty(currentExchangeId) && 
+                            (currentExchangeId == storedExchangeId || currentExchangeId == primaryExchangeId))
+                        {
+                            shouldUpdateFromCurrent = true;
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(currentExchangeId) && currentExchangeId == primaryExchangeId)
+                    {
+                        // No stored exchange info, but current is primary - update it
+                        shouldUpdateFromCurrent = true;
+                    }
+                    
+                    // Update with current price data if conditions are met
+                    if (shouldUpdateFromCurrent)
+                    {
+                        var currentPair = _allPairs.FirstOrDefault(p => $"{p.Base}/{p.Quote}" == favorite.Symbol);
+                        if (currentPair != null)
+                        {
+                            favorite.Price = currentPair.Price;
+                            favorite.PriceUsd = currentPair.PriceUsd;
+                            favorite.Volume = currentPair.Volume;
+                            favorite.Time = currentPair.Time;
+                            favorite.FormattedTime = currentPair.FormattedTime;
+                            System.Diagnostics.Debug.WriteLine($"Updated favorite {favorite.Symbol} from current exchange ({currentExchangeName})");
+                        }
+                    }
+                    else
+                    {
+                        // Add note about why price wasn't updated
+                        if (storedExchangeId != null && favoriteExchangeInfo.TryGetValue(favorite.Symbol, out _))
+                        {
+                            var storedExchangeName = "Unknown";
+                            foreach (var kvp in _exchangeMap)
+                            {
+                                if (kvp.Value == storedExchangeId)
+                                {
+                                    storedExchangeName = kvp.Key;
+                                    break;
+                                }
+                            }
+                            favorite.FormattedTime = $"{favorite.FormattedTime} (from {storedExchangeName})";
+                        }
+                        System.Diagnostics.Debug.WriteLine($"Favorite {favorite.Symbol} price NOT updated - stored from different exchange");
                     }
                     
                     _favoritePairs.Add(favorite);
