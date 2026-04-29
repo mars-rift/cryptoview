@@ -13,6 +13,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using cryptoview.Models;
 using cryptoview.Services;
 using cryptoview.Windows;
@@ -57,6 +58,32 @@ namespace cryptoview
         public string? GetCurrentSelectedExchangeName()
         {
             return ExchangesComboBox?.SelectedItem?.ToString();
+        }
+
+        public string? GetExchangeIdByName(string exchangeName)
+        {
+            if (string.IsNullOrEmpty(exchangeName))
+                return null;
+
+            return _exchangeMap.TryGetValue(exchangeName, out var id) ? id : null;
+        }
+
+        public string? GetExchangeNameById(string exchangeId)
+        {
+            if (string.IsNullOrEmpty(exchangeId))
+                return null;
+
+            foreach (var kvp in _exchangeMap)
+            {
+                if (kvp.Value == exchangeId)
+                    return kvp.Key;
+            }
+            return null;
+        }
+
+        public IEnumerable<string> GetAvailableExchangeNames()
+        {
+            return _exchangeMap.Keys;
         }
 
         private async System.Threading.Tasks.Task InitializeUserSettingsAsync()
@@ -1071,7 +1098,17 @@ namespace cryptoview
                             currentPair?.PriceUsd, 
                             currentExchange,
                             currentExchangeId);
-                        
+
+                        if (currentPair != null && currentPair.PriceUsd > 0)
+                        {
+                            await _dataService.SaveHistoricalPriceAsync(new HistoricalPrice
+                            {
+                                Symbol = symbol,
+                                Price = currentPair.PriceUsd,
+                                Timestamp = DateTime.UtcNow
+                            });
+                        }
+
                         button.Content = "★";
                         System.Diagnostics.Debug.WriteLine($"Added {symbol} to favorites with exchange: {currentExchange}");
                     }
@@ -1256,11 +1293,13 @@ namespace cryptoview
                 // Get exchange info for each favorite
                 var favoriteExchangeInfo = await _dataService.GetFavoriteExchangeInfoAsync();
                 
-                // Get primary exchange setting
+                // Get primary exchange settings
                 var primaryExchangeId = await _dataService.GetPrimaryExchangeForFavoritesAsync();
+                var usePrimaryExchangeForFavorites = await _dataService.GetUsePrimaryExchangeForFavoritesAsync();
                 
-                System.Diagnostics.Debug.WriteLine($"Got {detailedFavorites.Count} detailed favorites. Primary exchange: {primaryExchangeId}, Current exchange: {currentExchangeId}");
+                System.Diagnostics.Debug.WriteLine($"Got {detailedFavorites.Count} detailed favorites. Primary exchange: {primaryExchangeId}, UsePrimary: {usePrimaryExchangeForFavorites}, Current exchange: {currentExchangeId}");
                 
+                var historySaveTasks = new List<Task>();
                 foreach (var favorite in detailedFavorites)
                 {
                     // Check if we should update price from current data
@@ -1273,14 +1312,14 @@ namespace cryptoview
                         storedExchangeId = exchangeInfo.Item1;
                         priceTimestamp = exchangeInfo.Item2;
                         
-                        // Only update if current exchange matches the stored exchange, or if it's the primary exchange
+                        // Only update if current exchange matches the stored exchange, or if it's the configured primary exchange
                         if (!string.IsNullOrEmpty(currentExchangeId) && 
-                            (currentExchangeId == storedExchangeId || currentExchangeId == primaryExchangeId))
+                            (currentExchangeId == storedExchangeId || (usePrimaryExchangeForFavorites && currentExchangeId == primaryExchangeId)))
                         {
                             shouldUpdateFromCurrent = true;
                         }
                     }
-                    else if (!string.IsNullOrEmpty(currentExchangeId) && currentExchangeId == primaryExchangeId)
+                    else if (usePrimaryExchangeForFavorites && !string.IsNullOrEmpty(currentExchangeId) && currentExchangeId == primaryExchangeId)
                     {
                         // No stored exchange info, but current is primary - update it
                         shouldUpdateFromCurrent = true;
@@ -1297,25 +1336,18 @@ namespace cryptoview
                             favorite.Volume = currentPair.Volume;
                             favorite.Time = currentPair.Time;
                             favorite.FormattedTime = currentPair.FormattedTime;
+                            historySaveTasks.Add(_dataService.SaveHistoricalPriceAsync(new HistoricalPrice
+                            {
+                                Symbol = favorite.Symbol,
+                                Price = favorite.PriceUsd,
+                                Timestamp = DateTime.UtcNow
+                            }));
                             System.Diagnostics.Debug.WriteLine($"Updated favorite {favorite.Symbol} from current exchange ({currentExchangeName})");
                         }
                     }
                     else
                     {
-                        // Add note about why price wasn't updated
-                        if (storedExchangeId != null && favoriteExchangeInfo.TryGetValue(favorite.Symbol, out _))
-                        {
-                            var storedExchangeName = "Unknown";
-                            foreach (var kvp in _exchangeMap)
-                            {
-                                if (kvp.Value == storedExchangeId)
-                                {
-                                    storedExchangeName = kvp.Key;
-                                    break;
-                                }
-                            }
-                            favorite.FormattedTime = $"{favorite.FormattedTime} (from {storedExchangeName})";
-                        }
+                        // When price is preserved from the stored source exchange, keep source exchange in its own column
                         System.Diagnostics.Debug.WriteLine($"Favorite {favorite.Symbol} price NOT updated - stored from different exchange");
                     }
                     
@@ -1329,11 +1361,13 @@ namespace cryptoview
                     // Only add if not already in the favorites list
                     if (!_favoritePairs.Any(f => f.Symbol == $"{pair.Base}/{pair.Quote}"))
                     {
+                        pair.SourceExchange = currentExchangeName ?? "Unknown";
                         _favoritePairs.Add(pair);
                         System.Diagnostics.Debug.WriteLine($"Added current pair to favorites: {pair.Symbol}");
                     }
                 }
                 
+                await Task.WhenAll(historySaveTasks);
                 System.Diagnostics.Debug.WriteLine($"RefreshFavoritesTab completed. Total favorites in UI: {_favoritePairs.Count}");
                 
                 // Force the UI to update on the dispatcher thread
@@ -1354,6 +1388,129 @@ namespace cryptoview
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error refreshing favorites: {ex.Message}");
+            }
+        }
+
+        private async Task LoadFavoritePriceHistoryAsync(string symbol)
+        {
+            if (string.IsNullOrEmpty(symbol))
+            {
+                ShowNoChartMessage("Select a favorite to see price history.");
+                return;
+            }
+
+            try
+            {
+                var to = DateTime.UtcNow;
+                var from = to.AddHours(-24);
+                var prices = await _dataService.GetHistoricalPricesAsync(symbol, from, to);
+
+                PriceHistoryCanvas.Children.Clear();
+                if (prices == null || prices.Count == 0)
+                {
+                    ShowNoChartMessage($"No price history available yet for {symbol}.");
+                    return;
+                }
+
+                PriceHistoryCanvas.Visibility = Visibility.Visible;
+                NoChartTextBlock.Visibility = Visibility.Collapsed;
+
+                double canvasWidth = PriceHistoryCanvas.ActualWidth;
+                double canvasHeight = PriceHistoryCanvas.ActualHeight;
+
+                if (canvasWidth <= 0 || canvasHeight <= 0)
+                {
+                    PriceHistoryCanvas.Measure(new Size(800, 250));
+                    canvasWidth = PriceHistoryCanvas.DesiredSize.Width;
+                    canvasHeight = PriceHistoryCanvas.DesiredSize.Height;
+                }
+
+                if (canvasWidth <= 0) canvasWidth = 780;
+                if (canvasHeight <= 0) canvasHeight = 220;
+
+                decimal minPrice = prices.Min(p => p.Price);
+                decimal maxPrice = prices.Max(p => p.Price);
+                if (minPrice == maxPrice)
+                {
+                    minPrice -= 1;
+                    maxPrice += 1;
+                }
+
+                var polyline = new Polyline
+                {
+                    Stroke = Brushes.Lime,
+                    StrokeThickness = 2
+                };
+
+                var pointCount = prices.Count;
+                for (int i = 0; i < pointCount; i++)
+                {
+                    var item = prices[i];
+                    double x = (canvasWidth - 20) * i / Math.Max(1, pointCount - 1) + 10;
+                    double normalized = (double)((item.Price - minPrice) / (maxPrice - minPrice));
+                    double y = canvasHeight - 10 - normalized * (canvasHeight - 20);
+                    polyline.Points.Add(new Point(x, y));
+                }
+
+                // Draw axes
+                var xAxis = new Line
+                {
+                    X1 = 10,
+                    Y1 = canvasHeight - 10,
+                    X2 = canvasWidth - 10,
+                    Y2 = canvasHeight - 10,
+                    Stroke = Brushes.Teal,
+                    StrokeThickness = 1
+                };
+                var yAxis = new Line
+                {
+                    X1 = 10,
+                    Y1 = 10,
+                    X2 = 10,
+                    Y2 = canvasHeight - 10,
+                    Stroke = Brushes.Teal,
+                    StrokeThickness = 1
+                };
+
+                PriceHistoryCanvas.Children.Add(xAxis);
+                PriceHistoryCanvas.Children.Add(yAxis);
+                PriceHistoryCanvas.Children.Add(polyline);
+
+                var minText = new TextBlock { Text = $"{minPrice:N2}", Foreground = Brushes.LightGreen, FontFamily = new FontFamily("Consolas") };
+                var maxText = new TextBlock { Text = $"{maxPrice:N2}", Foreground = Brushes.LightGreen, FontFamily = new FontFamily("Consolas") };
+                Canvas.SetLeft(minText, 12);
+                Canvas.SetTop(minText, canvasHeight - 24);
+                Canvas.SetLeft(maxText, 12);
+                Canvas.SetTop(maxText, 4);
+                PriceHistoryCanvas.Children.Add(minText);
+                PriceHistoryCanvas.Children.Add(maxText);
+
+                HistoryDetailTextBlock.Text = $"Showing {prices.Count} points from {from.ToLocalTime():yyyy-MM-dd HH:mm} to {to.ToLocalTime():yyyy-MM-dd HH:mm} for {symbol}.";
+            }
+            catch (Exception ex)
+            {
+                ShowNoChartMessage($"Unable to load history: {ex.Message}");
+            }
+        }
+
+        private void ShowNoChartMessage(string message)
+        {
+            PriceHistoryCanvas.Children.Clear();
+            PriceHistoryCanvas.Visibility = Visibility.Collapsed;
+            NoChartTextBlock.Visibility = Visibility.Visible;
+            NoChartTextBlock.Text = message;
+            HistoryDetailTextBlock.Text = string.Empty;
+        }
+
+        private async void FavoritesDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (FavoritesDataGrid.SelectedItem is TradingPair favorite)
+            {
+                await LoadFavoritePriceHistoryAsync(favorite.Symbol);
+            }
+            else
+            {
+                ShowNoChartMessage("Select a favorite to see price history.");
             }
         }
 

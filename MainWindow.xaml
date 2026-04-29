@@ -336,18 +336,21 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="260"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         
                         <TextBlock Grid.Row="0" Text="Favorite Trading Pairs (from all exchanges)" 
                                    Margin="10" FontWeight="Bold" Foreground="#00FFFF"/>
                         
-                        <DataGrid x:Name="FavoritesDataGrid" Grid.Row="1" Margin="10" AutoGenerateColumns="False" IsReadOnly="True">
+                        <DataGrid x:Name="FavoritesDataGrid" Grid.Row="1" Margin="10" AutoGenerateColumns="False" IsReadOnly="True" SelectionChanged="FavoritesDataGrid_SelectionChanged">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="SYMBOL" Binding="{Binding Symbol}" Width="*"/>
                                 <DataGridTextColumn Header="BASE" Binding="{Binding Base}" Width="*"/>
                                 <DataGridTextColumn Header="QUOTE" Binding="{Binding Quote}" Width="*"/>
                                 <DataGridTextColumn Header="LAST PRICE" Binding="{Binding PriceUsd, StringFormat={}{0:N2}}" Width="*"/>
-                                <DataGridTextColumn Header="SAVED FROM" Binding="{Binding FormattedTime}" Width="*"/>
+                                <DataGridTextColumn Header="SAVED FROM" Binding="{Binding SourceExchange}" Width="*"/>
                                 <DataGridTemplateColumn Header="REMOVE" Width="80">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -357,6 +360,16 @@
                                 </DataGridTemplateColumn>
                             </DataGrid.Columns>
                         </DataGrid>
+
+                        <TextBlock Grid.Row="2" x:Name="HistoryHeaderTextBlock" Text="Price history for the selected favorite" 
+                                   Margin="10,0,10,0" FontWeight="Bold" Foreground="#00FFFF"/>
+                        <Border Grid.Row="3" Margin="10" BorderBrush="#00FF9C" BorderThickness="1" Background="#121225">
+                            <Grid>
+                                <TextBlock x:Name="NoChartTextBlock" Text="Select a favorite to see price history." Foreground="#00FF9C" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Visible"/>
+                                <Canvas x:Name="PriceHistoryCanvas" Margin="10" Background="#0F0F17" Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+                        <TextBlock Grid.Row="4" x:Name="HistoryDetailTextBlock" Text="" Margin="10,5,10,10" Foreground="#00FF9C"/>
                     </Grid>
                 </TabItem>
             </TabControl>

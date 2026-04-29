@@ -92,6 +92,8 @@ namespace cryptoview.Models
 
         public bool IsFavorite { get; set; }
 
+        public string? SourceExchange { get; set; }
+
         public string Symbol => $"{Base}/{Quote}";
 
         public event PropertyChangedEventHandler? PropertyChanged;

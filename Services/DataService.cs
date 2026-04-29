@@ -352,6 +352,7 @@ namespace cryptoview.Services
                             Quote = parts.Length > 1 && !string.IsNullOrEmpty(parts[1]) ? parts[1] : "Unknown",
                             PriceUsd = 0,
                             FormattedTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " (Saved)",
+                            SourceExchange = "Unknown",
                             IsFavorite = true
                         };
 
@@ -400,15 +401,9 @@ namespace cryptoview.Services
                         PriceUsd = reader.IsDBNull(3) ? 0 : reader.GetDecimal(3),
                         FormattedTime = reader.IsDBNull(5) ? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") : 
                                        DateTime.Parse(reader.GetString(5)).ToString("yyyy-MM-dd HH:mm:ss"),
+                        SourceExchange = !reader.IsDBNull(4) ? reader.GetString(4) : "Unknown",
                         IsFavorite = true
                     };
-
-                    // Add exchange info to formatted time for clarity
-                    if (!reader.IsDBNull(4))
-                    {
-                        var exchange = reader.GetString(4);
-                        favorite.FormattedTime += $" ({exchange})";
-                    }
 
                     favorites.Add(favorite);
                 }
@@ -436,6 +431,7 @@ namespace cryptoview.Services
                             Quote = parts.Length > 1 && !string.IsNullOrEmpty(parts[1]) ? parts[1] : "Unknown",
                             PriceUsd = 0,
                             FormattedTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " (Legacy)",
+                            SourceExchange = "Unknown",
                             IsFavorite = true
                         };
 
@@ -576,6 +572,24 @@ namespace cryptoview.Services
         {
             await SaveSettingAsync("PrimaryExchangeForFavorites", exchangeId);
             System.Diagnostics.Debug.WriteLine($"Set primary exchange for favorites to: {exchangeId}");
+        }
+
+        /// <summary>
+        /// Gets whether the primary exchange should be used for all favorites
+        /// </summary>
+        public async Task<bool> GetUsePrimaryExchangeForFavoritesAsync()
+        {
+            var value = await GetSettingAsync("UsePrimaryExchangeForFavorites");
+            return !string.IsNullOrEmpty(value) && bool.TryParse(value, out var result) && result;
+        }
+
+        /// <summary>
+        /// Enables or disables use of the primary favorites exchange
+        /// </summary>
+        public async Task SetUsePrimaryExchangeForFavoritesAsync(bool enabled)
+        {
+            await SaveSettingAsync("UsePrimaryExchangeForFavorites", enabled ? "true" : "false");
+            System.Diagnostics.Debug.WriteLine($"Set UsePrimaryExchangeForFavorites to: {enabled}");
         }
 
         public async Task CleanupFavoritesAsync()
